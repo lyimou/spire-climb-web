@@ -22,6 +22,7 @@ class SlayTheSpireGame {
       drawPile: [],
       relics: [],
       potionSlots: 3,
+      extraDrawsLeft: 5,
     };
 
     this.cards = [];
@@ -41,8 +42,21 @@ class SlayTheSpireGame {
     this.initBaseDeck();
   }
   async loadGameData() {
-    // 这里应该是从服务器加载数据，暂时用本地数据
-    this.cards = [
+    // 卡牌数据来自 assets/data/cards.json。
+    // 之前这里硬编码了 4 张牌的副本，导致 cards.json 里的 11 张牌（含 2 张稀有牌）
+    // 从未被加载：宝藏房间筛 rare 永远为空，多种卡牌效果也无法生效。
+    let loadedCards = null;
+    try {
+      const response = await fetch("assets/data/cards.json");
+      if (response.ok) {
+        loadedCards = await response.json();
+      }
+    } catch (error) {
+      console.warn("cards.json 加载失败，使用内置基础牌组：", error);
+    }
+
+    // 兜底：即使 fetch 失败（例如以 file:// 直接打开），也要有可玩的牌组
+    const fallbackCards = [
       {
         id: "strike",
         name: "打击",
@@ -61,26 +75,9 @@ class SlayTheSpireGame {
         description: "获得5点格挡",
         rarity: "basic",
       },
-      {
-        id: "bash",
-        name: "重击",
-        type: "attack",
-        cost: 2,
-        damage: 8,
-        description: "造成8点伤害",
-        rarity: "common",
-      },
-      {
-        id: "iron_wave",
-        name: "铁斩波",
-        type: "attack",
-        cost: 1,
-        damage: 5,
-        block: 5,
-        description: "造成5点伤害，获得5点格挡",
-        rarity: "common",
-      },
     ];
+
+    this.cards = Array.isArray(loadedCards) && loadedCards.length > 0 ? loadedCards : fallbackCards;
 
     this.enemies = [
       {
@@ -117,14 +114,34 @@ class SlayTheSpireGame {
         name: "燃烧之血",
         description: "每场战斗结束时恢复6点生命",
         effect: "heal_after_combat",
+        amount: 6,
       },
       {
         id: "snake_ring",
         name: "蛇之戒指",
         description: "每回合额外抽1张牌",
         effect: "extra_card_draw",
+        amount: 1,
+      },
+      {
+        id: "cracked_core",
+        name: "裂变核心",
+        description: "战斗开始时获得1点力量",
+        effect: "strength_at_battle_start",
+        amount: 1,
       },
     ];
+  }
+
+  /** 是否持有某个遗物。 */
+  hasRelic(effect) {
+    return this.gameState.relics.some((r) => r.effect === effect);
+  }
+
+  /** 取遗物的数值（默认 0）。 */
+  relicAmount(effect) {
+    const relic = this.gameState.relics.find((r) => r.effect === effect);
+    return relic?.amount ?? 0;
   }
 
   setupEventListeners() {
@@ -145,8 +162,9 @@ class SlayTheSpireGame {
       this.endTurn();
     });
 
+    // 额外抽牌按钮：每回合最多 5 次，每次抽 1 张（原实现调用不存在的 drawCards()）
     document.getElementById("draw-cards-btn").addEventListener("click", () => {
-      this.drawCards(1);
+      this.drawExtraCard();
     });
 
     // 设置按钮
@@ -226,6 +244,8 @@ class SlayTheSpireGame {
         this.gameState.player.currentHP = 75;
         this.gameState.player.energy = 3;
         this.gameState.player.maxEnergy = 3;
+        // 原本故障机器人没有任何初始遗物，是三个角色里唯一空手的
+        this.addRelic("cracked_core");
         break;
     }
 
@@ -365,10 +385,27 @@ class SlayTheSpireGame {
       over: false,
     };
 
-    this.shuffleDeck();
+    this.gameState.extraDrawsLeft = SlayTheSpireGame.EXTRA_DRAWS_PER_TURN;
+    this.updateDrawButton();
+
+    // 每场战斗都要重新发牌。
+    // 原实现只调用 shuffleDeck()，而它只打乱「现有抽牌堆」——如果上一场战斗
+    // 把抽牌堆用光了，新战斗会以空抽牌堆 + 空手牌开始，直接无法出牌。
+    this.gameState.drawPile = this.shuffleArray([...this.gameState.deck]);
+    this.gameState.discard = [];
+    this.gameState.hand = [];
+    this.gameState.player.block = 0;
+
     this.drawInitialHand();
     this.updateBattleUI();
     this.addLog("战斗开始！");
+
+    // 遗物：战斗开始时获得力量
+    const openingStrength = this.relicAmount("strength_at_battle_start");
+    if (openingStrength > 0) {
+      this.gameState.player.strength = (this.gameState.player.strength ?? 0) + openingStrength;
+      this.addLog(`遗物生效：获得 ${openingStrength} 点力量`);
+    }
   }
 
   /**
@@ -397,10 +434,15 @@ class SlayTheSpireGame {
 
   drawInitialHand() {
     this.gameState.hand = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < this.cardsPerTurn(); i++) {
       this.drawCard();
     }
     this.updateHandUI();
+  }
+
+  /** 每回合抽牌数：基础 5 张，加上遗物加成。 */
+  cardsPerTurn() {
+    return 5 + this.relicAmount("extra_card_draw");
   }
 
   drawCard() {
@@ -432,6 +474,12 @@ class SlayTheSpireGame {
       return;
     }
 
+    // 检查卡牌自身的打出条件
+    if (!this.canPlayCard(card)) {
+      this.addLog(`${card.name} 现在无法打出`);
+      return;
+    }
+
     // 消耗能量
     this.gameState.player.energy -= card.cost;
 
@@ -449,15 +497,24 @@ class SlayTheSpireGame {
   }
 
   applyCardEffect(card) {
-    const enemy = this.gameState.battle.enemies[0];
+    const enemy = this.gameState.battle?.enemies?.[0];
+    if (!enemy) return;
 
-    if (card.damage) {
-      const damage = card.damage;
-      enemy.currentHP -= damage;
-      this.addLog(`对 ${enemy.name} 造成 ${damage} 点伤害`);
+    // 全身撞击：伤害等于当前格挡值
+    let damage = card.damage ?? 0;
+    if (card.id === "body_slam") damage = this.gameState.player.block;
+    // 力量加成对每次攻击生效
+    if (this.gameState.player.strength) damage += this.gameState.player.strength;
+
+    if (damage > 0) {
+      const dealt = Math.max(0, damage - (enemy.block ?? 0));
+      if (enemy.block) enemy.block = Math.max(0, enemy.block - damage);
+      enemy.currentHP -= dealt;
+      this.addLog(`对 ${enemy.name} 造成 ${dealt} 点伤害`);
 
       if (enemy.currentHP <= 0) {
         this.victory();
+        return;
       }
     }
 
@@ -465,6 +522,64 @@ class SlayTheSpireGame {
       this.gameState.player.block += card.block;
       this.addLog(`获得了 ${card.block} 点格挡`);
     }
+
+    // 虚弱：降低敌人下一回合的攻击力
+    if (card.weak) {
+      enemy.weak = (enemy.weak ?? 0) + card.weak;
+      this.addLog(`${enemy.name} 获得 ${card.weak} 层虚弱`);
+    }
+
+    // 力量：每层让攻击 +1
+    if (card.strength) {
+      this.gameState.player.strength = (this.gameState.player.strength ?? 0) + card.strength;
+      this.addLog(`获得 ${card.strength} 点力量`);
+    }
+
+    // 抽牌
+    if (card.draw) {
+      for (let i = 0; i < card.draw; i++) this.drawCard();
+    }
+
+    // 将一张副本加入弃牌堆（愤怒）
+    if (card.addToDiscard) {
+      const template = this.cards.find((c) => c.id === card.addToDiscard);
+      if (template) this.gameState.discard.push({ ...template });
+    }
+  }
+
+  /** 卡牌是否满足打出条件（冲突：手牌必须全是攻击牌）。 */
+  canPlayCard(card) {
+    if (card.id === "clash") {
+      return this.gameState.hand.every((c) => c.type === "attack");
+    }
+    return true;
+  }
+
+  /** 每回合的额外抽牌次数上限。 */
+  static EXTRA_DRAWS_PER_TURN = 5;
+
+  drawExtraCard() {
+    if (!this.gameState.battle || this.gameState.battle.over) return;
+    if (this.gameState.extraDrawsLeft <= 0) {
+      this.addLog("本回合的额外抽牌次数已用完");
+      return;
+    }
+    this.gameState.extraDrawsLeft -= 1;
+    this.drawCard();
+    this.updateDrawButton();
+  }
+
+  /** 同步额外抽牌按钮的可用状态与剩余次数。 */
+  updateDrawButton() {
+    const btn = document.getElementById("draw-cards-btn");
+    const counter = document.getElementById("draws-left");
+    if (counter) counter.textContent = this.gameState.extraDrawsLeft;
+    if (!btn) return;
+    const usable =
+      Boolean(this.gameState.battle) &&
+      !this.gameState.battle.over &&
+      this.gameState.extraDrawsLeft > 0;
+    btn.disabled = !usable;
   }
 
   endTurn() {
@@ -485,13 +600,15 @@ class SlayTheSpireGame {
     // 清理状态
     this.gameState.player.block = 0;
     this.gameState.player.energy = this.gameState.player.maxEnergy;
+    this.gameState.extraDrawsLeft = SlayTheSpireGame.EXTRA_DRAWS_PER_TURN;
+    this.updateDrawButton();
 
     // 弃掉手牌
     this.gameState.discard.push(...this.gameState.hand);
     this.gameState.hand = [];
 
-    // 抽新牌
-    for (let i = 0; i < 5; i++) {
+    // 抽新牌（数量受遗物影响）
+    for (let i = 0; i < this.cardsPerTurn(); i++) {
       this.drawCard();
     }
 
@@ -506,26 +623,35 @@ class SlayTheSpireGame {
       enemy.actions[Math.floor(Math.random() * enemy.actions.length)];
 
     switch (action.type) {
-      case "attack":
-        const damage = Math.max(0, action.damage - this.gameState.player.block);
+      case "attack": {
+        // 力量加成 + 虚弱扣减，两者都来自卡牌效果
+        const strength = enemy.strength ?? 0;
+        const weakPenalty = enemy.weak ? 0.75 : 1;
+        const raw = Math.round((action.damage + strength) * weakPenalty);
+        const blocked = Math.min(this.gameState.player.block, raw);
+        const damage = Math.max(0, raw - blocked);
         this.gameState.player.currentHP -= damage;
-        this.gameState.player.block = Math.max(
-          0,
-          this.gameState.player.block - action.damage,
+        this.gameState.player.block = Math.max(0, this.gameState.player.block - raw);
+        this.addLog(
+          `${enemy.name} 攻击，造成 ${damage} 点伤害${blocked > 0 ? `（格挡 ${blocked}）` : ""}`,
         );
-        this.addLog(`${enemy.name} 攻击，造成 ${action.damage} 点伤害`);
         break;
+      }
 
       case "block":
-        // 敌人获得格挡
-        this.addLog(`${enemy.name} 进行了防御`);
+        // 敌人获得格挡，之前的实现只写日志、不产生任何效果
+        enemy.block = (enemy.block ?? 0) + (action.block ?? 0);
+        this.addLog(`${enemy.name} 获得了 ${action.block ?? 0} 点格挡`);
         break;
 
       case "buff":
-        // 敌人强化
-        this.addLog(`${enemy.name} 强化了自己`);
+        enemy.strength = (enemy.strength ?? 0) + (action.strength ?? 0);
+        this.addLog(`${enemy.name} 强化了自己（力量 +${action.strength ?? 0}）`);
         break;
     }
+
+    // 虚弱在敌人行动后递减
+    if (enemy.weak) enemy.weak = Math.max(0, enemy.weak - 1);
 
     // 检查玩家死亡
     if (this.gameState.player.currentHP <= 0) {
@@ -560,11 +686,34 @@ class SlayTheSpireGame {
     this.gameState.player.gold += goldReward;
     this.addLog(`获得了 ${goldReward} 金币`);
 
-    // 回到地图
+    // 遗物：战斗结束后回血
+    const heal = this.relicAmount("heal_after_combat");
+    if (heal > 0) {
+      const before = this.gameState.player.currentHP;
+      this.gameState.player.currentHP = Math.min(
+        this.gameState.player.maxHP,
+        this.gameState.player.currentHP + heal,
+      );
+      const healed = this.gameState.player.currentHP - before;
+      if (healed > 0) this.addLog(`遗物生效：恢复 ${healed} 点生命`);
+    }
+
+    // 回到地图，并检查本层是否已清空
     setTimeout(() => {
+      this.checkFloorCleared();
       this.switchView("map-view");
       this.updateUI();
     }, 2000);
+  }
+
+  /** 所有节点完成后进入下一层。 */
+  checkFloorCleared() {
+    const allCleared = this.mapNodes.every((node) => node.completed);
+    if (!allCleared) return;
+
+    this.gameState.currentFloor += 1;
+    this.addLog(`进入第 ${this.gameState.currentFloor} 层`);
+    this.generateMap();
   }
 
   gameOver() {
@@ -748,23 +897,50 @@ class SlayTheSpireGame {
   }
 
   showTreasure() {
-    // 模拟宝藏房间
+    // 从 cards.json 的稀有牌中抽一张
     const rareCards = this.cards.filter((card) => card.rarity === "rare");
     if (rareCards.length > 0) {
       const randomCard =
         rareCards[Math.floor(Math.random() * rareCards.length)];
       this.gameState.deck.push({ ...randomCard });
       this.addLog(`在宝藏中找到了 ${randomCard.name}！`);
+    } else {
+      this.addLog("宝藏是空的……");
     }
 
     this.gameState.currentRoom.completed = true;
-    setTimeout(() => this.switchView("map-view"), 2000);
+    setTimeout(() => {
+      this.checkFloorCleared();
+      this.switchView("map-view");
+      this.updateUI();
+    }, 2000);
   }
 
   showShop() {
-    alert("商店（功能开发中）");
+    // 简易商店：花费金币买一张随机非基础牌
+    const PRICE = 50;
+    const affordable = this.gameState.player.gold >= PRICE;
+
+    if (!affordable) {
+      this.addLog(`商店：金币不足（需要 ${PRICE}，你有 ${this.gameState.player.gold}）`);
+    } else if (confirm(`花 ${PRICE} 金币购买一张随机卡牌？`)) {
+      const pool = this.cards.filter((c) => c.rarity !== "basic");
+      if (pool.length > 0) {
+        const bought = pool[Math.floor(Math.random() * pool.length)];
+        this.gameState.deck.push({ ...bought });
+        this.gameState.player.gold -= PRICE;
+        this.addLog(`购买了 ${bought.name}（-${PRICE} 金币）`);
+      } else {
+        this.addLog("商店：暂无可购买的卡牌");
+      }
+    } else {
+      this.addLog("商店：你什么也没买");
+    }
+
     this.gameState.currentRoom.completed = true;
+    this.checkFloorCleared();
     this.switchView("map-view");
+    this.updateUI();
   }
 
   showRest() {
@@ -776,7 +952,11 @@ class SlayTheSpireGame {
     this.addLog(`在篝火休息，恢复了 ${healAmount} 点生命值`);
 
     this.gameState.currentRoom.completed = true;
-    setTimeout(() => this.switchView("map-view"), 2000);
+    setTimeout(() => {
+      this.checkFloorCleared();
+      this.switchView("map-view");
+      this.updateUI();
+    }, 2000);
   }
 }
 

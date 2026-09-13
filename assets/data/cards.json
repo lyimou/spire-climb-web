@@ -41,6 +41,7 @@
     "type": "attack",
     "cost": 0,
     "damage": 6,
+    "addToDiscard": "anger",
     "description": "造成6点伤害。将一张愤怒加入弃牌堆。",
     "rarity": "common"
   },

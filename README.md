@@ -69,33 +69,41 @@ spire-climb-web/
 
 ## Known issues
 
-`scripts/audit-bugs.mjs` drives the real page in a headless browser and asserts behaviour, so this list is measured rather than guessed. Run it with the folder served over HTTP:
+`scripts/audit-bugs.mjs` drives the real page in a headless browser and asserts behaviour, so this list is measured rather than guessed. It currently reports **14/14 checks passing**.
 
 ```bash
 python -m http.server 5173
 node scripts/audit-bugs.mjs http://localhost:5173    # needs playwright
 ```
 
-**Fixed in this repository:**
+### Fixed
 
 | Was | Fix |
 | --- | --- |
-| Enemy HP never re-rendered after a card was played, so the enemy bar stayed full all fight | `playCard()` now calls `updateBattleUI()` |
-| `drawCard()` refilled from discards and then `shuffleDeck()` overwrote the pile with the **whole deck**, duplicating cards and losing others (live total drifted 9 → 13 → 11) | split into `shuffleArray()` + a `shuffleDeck()` that only shuffles the current pile |
-| Victory re-fired on every subsequent card once the enemy died — unlimited gold | battle now carries an `over` flag that `victory()` checks |
-| `endTurn()` threw `TypeError` when no battle was active, and kept resolving after the player died | both paths guarded |
+| `index.html` had a broken `<title>` (missing `>`) plus mangled encoding, so the HTML parser swallowed the whole document and the game never loaded | rebuilt from the pristine original; UTF-8, no BOM |
+| **`loadGameData()` never loaded `assets/data/cards.json`** — it hardcoded a 4-card copy. The 11-card file (including 2 rare cards) was dead weight, which is why treasure rooms could never pay out | fetch `cards.json`, with an inline fallback for `file://` |
+| Enemy HP never re-rendered after a card, so the enemy bar stayed full all fight | `playCard()` calls `updateBattleUI()` |
+| `drawCard()` refilled from discards and then `shuffleDeck()` overwrote the pile with the **whole deck** — cards were duplicated and lost (live total drifted 9 → 13 → 11) | split `shuffleArray()` from a `shuffleDeck()` that only shuffles the current pile |
+| **A new battle never reset the draw pile**, so fighting twice in a row started you with an empty pile and an empty hand — unplayable | `startBattle()` rebuilds the pile from the deck and clears hand/discard |
+| Victory re-fired on every later card once the enemy died — unlimited gold | battle carries an `over` flag that `victory()` checks |
+| `endTurn()` threw `TypeError` with no battle active, and kept resolving after the player died | both paths guarded |
 | Switching heroes accumulated every hero's starting relic | `selectCharacter()` resets relics |
+| Declared card effects were unimplemented: `weak`, `strength`, `draw`, `addToDiscard`, and `body_slam`'s block-scaling | implemented in `applyCardEffect()`; `clash` now checks its hand condition |
+| Enemy `block` and `buff` actions only wrote log lines and did nothing | they now grant block and strength, which feed into damage |
+| Relics were inert — stored and displayed, but `effect` was never read | wired up: heal on victory, extra card per turn, strength at battle start |
+| Draw-cards button was `disabled` and its handler called a non-existent `drawCards()` | implemented `drawExtraCard()` with a per-turn counter |
+| `currentFloor` never advanced | `checkFloorCleared()` bumps the floor and rebuilds the map |
+| Shop was an `alert()` stub | spends gold on a random non-basic card |
+| 故障机器人 (Defect) had no starting relic | added 裂变核心 (strength at battle start) |
 
-**Still open (documented, not hidden):**
+### Still open
 
 | Issue | Detail |
 | --- | --- |
-| Treasure rooms can never grant anything | `showTreasure()` filters for `rarity === "rare"`, but no rare card exists in the 4-card pool |
-| Relics are inert | They are stored and displayed, but no code reads `effect`, so "燃烧之血" and "蛇之戒指" do nothing |
-| Draw-cards button is dead | It is `disabled` in the markup and its handler calls `this.drawCards()`, which does not exist (the method is `drawCard()`) |
-| `currentFloor` never increments | Clearing all nodes leaves the floor indicator at 1 and the progress bar never reaches 100% |
-| Shop is a stub | `showShop()` is an `alert()` |
-| Chinese text is mojibake in `index.html` | Encoding damage from an earlier tooling pass; the original text is recoverable but has not been rewritten |
+| Card balance is untested | The starting deck is 5×打击 + 4×防御; `clash` (14 damage for 0 energy) and `impervious` (30 block) are strong picks and there is no difficulty curve yet |
+| The Chinese copy in the HTML was previously mojibake | The encoding is now correct, but the wording has not been reviewed since |
+| Content is 11 cards, 2 enemies, 1 floor layout | Enough to demonstrate the systems, not a balanced game |
+
 
 ## What I learned / challenges
 
