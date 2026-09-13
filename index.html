@@ -1,0 +1,289 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>?砍?銋? - 蝵△???桀?憛?/title>
+    <link rel="stylesheet" href="assets/style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="game-container">
+      <!-- 皜豢??? -->
+      <header class="game-header">
+        <h1><i class="fas fa-tower"></i> ?砍?銋?</h1>
+        <div class="header-controls">
+          <button id="settings-btn" class="btn-icon" title="霈曄蔭">
+            <i class="fas fa-cog"></i>
+          </button>
+          <button id="help-btn" class="btn-icon" title="撣桀">
+            <i class="fas fa-question-circle"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- 銝餅虜???-->
+      <main class="game-main">
+        <!-- ?啣閫 -->
+        <div id="map-view" class="game-view active">
+          <div class="map-container">
+            <div class="floor-indicator">
+              <span class="floor-title"
+                >蝚?<span id="current-floor">1</span> 撅?/span
+              >
+              <div class="floor-progress">
+                <div class="progress-bar">
+                  <div class="progress-fill" id="floor-progress"></div>
+                </div>
+                <span class="progress-text">蝎曇: 0/2 | BOSS: 0/1</span>
+              </div>
+            </div>
+            <div class="map-grid" id="map-grid">
+              <!-- ?啣?撠?JS?冽???-->
+            </div>
+          </div>
+        </div>
+
+        <!-- ??閫 -->
+        <div id="battle-view" class="game-view">
+          <div class="battle-container">
+            <!-- ?犖?箏? -->
+            <div class="enemy-section">
+              <div class="enemy-info" id="enemy-info">
+                <!-- ?犖靽⊥?冽???-->
+              </div>
+            </div>
+
+            <!-- ?拙振?箏? -->
+            <div class="player-section">
+              <div class="player-stats">
+                <div class="stat-item">
+                  <span class="stat-label">???/span>
+                  <div class="stat-value">
+                    <span id="player-hp">80</span>/<span id="player-max-hp"
+                      >80</span
+                    >
+                  </div>
+                  <div class="hp-bar">
+                    <div class="hp-fill" id="hp-fill"></div>
+                  </div>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">?賡?</span>
+                  <div class="stat-value">
+                    <span id="player-energy">3</span>/<span
+                      id="player-max-energy"
+                      >3</span
+                    >
+                  </div>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">?潭</span>
+                  <div class="stat-value" id="player-block">0</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ???亙? -->
+            <div class="battle-log">
+              <h3>???亙? <i class="fas fa-scroll"></i></h3>
+              <div class="log-content" id="battle-log">
+                <div class="log-entry">??撘憪?</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ?∠??箏? -->
+        <div class="card-section">
+          <div class="hand-section">
+            <div class="hand-header">
+              <h3>?? (<span id="hand-count">0</span>/10)</h3>
+              <div class="deck-info">
+                ??: <span id="deck-count">0</span> | 撘???
+                <span id="discard-count">0</span>
+              </div>
+            </div>
+            <div class="hand-cards" id="hand-cards">
+              <!-- ????JS?冽???-->
+            </div>
+          </div>
+
+          <div class="card-controls">
+            <button id="end-turn-btn" class="btn-primary">
+              <i class="fas fa-hourglass-end"></i> 蝏???
+            </button>
+            <button id="draw-cards-btn" class="btn-secondary" disabled>
+              ?賜? (<span id="draws-left">5</span>)
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <!-- 摨?批??-->
+      <footer class="game-footer">
+        <div class="resource-bar">
+          <div class="resource-item">
+            <span class="resource-icon"><i class="fas fa-coins"></i></span>
+            <span class="resource-value" id="gold">100</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-icon"><i class="fas fa-fire-alt"></i></span>
+            <span class="resource-value" id="potion-slots">2/3</span>
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <button id="map-btn" class="btn-tab active">
+            <i class="fas fa-map"></i> ?啣
+          </button>
+          <button id="deck-btn" class="btn-tab">
+            <i class="fas fa-layer-group"></i> ??
+          </button>
+          <button id="relics-btn" class="btn-tab">
+            <i class="fas fa-gem"></i> ?
+          </button>
+          <button id="campfire-btn" class="btn-tab">
+            <i class="fas fa-campfire"></i> 蝭
+          </button>
+        </div>
+      </footer>
+    </div>
+
+    <!-- 璅⊥? -->
+    <div id="card-modal" class="modal">
+      <div class="modal-content">
+        <span class="close-modal">&times;</span>
+        <div id="card-modal-content">
+          <!-- ?∠?霂行??捆 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 霈曄蔭璅⊥? -->
+    <div id="settings-modal" class="modal">
+      <div class="modal-content">
+        <h2><i class="fas fa-cog"></i> 霈曄蔭</h2>
+        <div class="settings-section">
+          <h3>皜豢?霈曄蔭</h3>
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" id="setting-fast-mode" checked />
+              敹恍芋撘?
+            </label>
+          </div>
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" id="setting-show-damage" checked />
+              ?曄內隡文拿?啣?
+            </label>
+          </div>
+          <div class="setting-item">
+            <label
+              >?函?漲嚗?
+              <select id="setting-animation-speed">
+                <option value="slow">??/option>
+                <option value="normal" selected>?桅?/option>
+                <option value="fast">敹?/option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="modal-buttons">
+          <button id="save-settings" class="btn-primary">靽?</button>
+          <button id="close-settings" class="btn-secondary">??</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 撣桀璅⊥? -->
+    <div id="help-modal" class="modal">
+      <div class="modal-content">
+        <h2><i class="fas fa-question-circle"></i> 皜豢???</h2>
+        <div class="help-content">
+          <h3>皜豢??格?</h3>
+          <p>?砌?憛▲嚗韐交?蝏OSS嚗?/p>
+
+          <h3>?箸閫?</h3>
+          <ul>
+            <li>瘥??????寡???其???∠?</li>
+            <li>?潭?澆??蝏??嗆?憭?/li>
+            <li>??閫?雿???嚗移蝞?臬??/li>
+          </ul>
+
+          <h3>?∠?蝐餃?</h3>
+          <div class="card-type-example">
+            <div class="card-type attack">?餃??/div>
+            <div class="card-type skill">??賜?</div>
+            <div class="card-type power">?賢???/div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 皜豢?撘憪???-->
+    <div id="start-screen" class="overlay active">
+      <div class="start-container">
+        <h1><i class="fas fa-tower"></i> ?砍?銋?</h1>
+        <p class="subtitle">蝑?∠??皜豢?</p>
+
+        <div class="character-select">
+          <h2>?雿??梢?</h2>
+          <div class="characters">
+            <div class="character-card" data-character="ironclad">
+              <div class="character-icon ironclad">
+                <i class="fas fa-fist-raised"></i>
+              </div>
+              <h3>??ㄚ</h3>
+              <p>????? 80</p>
+              <p>???: ?銋?</p>
+              <button class="btn-select">?</button>
+            </div>
+
+            <div class="character-card" data-character="silent">
+              <div class="character-icon silent">
+                <i class="fas fa-mask"></i>
+              </div>
+              <h3>????</h3>
+              <p>????? 70</p>
+              <p>???: ????</p>
+              <button class="btn-select">?</button>
+            </div>
+
+            <div class="character-card" data-character="defect">
+              <div class="character-icon defect">
+                <i class="fas fa-bolt"></i>
+              </div>
+              <h3>???箏鈭?/h3>
+              <p>????? 75</p>
+              <p>???: 鋆??詨?</p>
+              <button class="btn-select">?</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="start-actions">
+          <button id="start-game-btn" class="btn-primary btn-large">
+            <i class="fas fa-play"></i> 撘憪虜??
+          </button>
+          <button id="tutorial-btn" class="btn-secondary">
+            <i class="fas fa-graduation-cap"></i> ??
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/game.js"></script>
+  </body>
+</html>
+

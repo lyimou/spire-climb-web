@@ -1,0 +1,112 @@
+[
+  {
+    "id": "strike",
+    "name": "打击",
+    "type": "attack",
+    "cost": 1,
+    "damage": 6,
+    "description": "造成6点伤害",
+    "rarity": "basic",
+    "upgraded": {
+      "damage": 9,
+      "description": "造成9点伤害"
+    }
+  },
+  {
+    "id": "defend",
+    "name": "防御",
+    "type": "skill",
+    "cost": 1,
+    "block": 5,
+    "description": "获得5点格挡",
+    "rarity": "basic",
+    "upgraded": {
+      "block": 8,
+      "description": "获得8点格挡"
+    }
+  },
+  {
+    "id": "bash",
+    "name": "重击",
+    "type": "attack",
+    "cost": 2,
+    "damage": 8,
+    "weak": 2,
+    "description": "造成8点伤害。给予2层虚弱。",
+    "rarity": "common"
+  },
+  {
+    "id": "anger",
+    "name": "愤怒",
+    "type": "attack",
+    "cost": 0,
+    "damage": 6,
+    "description": "造成6点伤害。将一张愤怒加入弃牌堆。",
+    "rarity": "common"
+  },
+  {
+    "id": "clash",
+    "name": "冲突",
+    "type": "attack",
+    "cost": 0,
+    "damage": 14,
+    "description": "只能在本回合只有攻击牌时打出。造成14点伤害。",
+    "rarity": "common"
+  },
+  {
+    "id": "cleave",
+    "name": "顺劈斩",
+    "type": "attack",
+    "cost": 1,
+    "damage": 8,
+    "description": "对所有敌人造成8点伤害。",
+    "rarity": "common"
+  },
+  {
+    "id": "iron_wave",
+    "name": "铁斩波",
+    "type": "attack",
+    "cost": 1,
+    "damage": 5,
+    "block": 5,
+    "description": "造成5点伤害。获得5点格挡。",
+    "rarity": "common"
+  },
+  {
+    "id": "shrug_it_off",
+    "name": "耸肩无视",
+    "type": "skill",
+    "cost": 1,
+    "block": 8,
+    "draw": 1,
+    "description": "获得8点格挡。抽1张牌。",
+    "rarity": "common"
+  },
+  {
+    "id": "body_slam",
+    "name": "全身撞击",
+    "type": "attack",
+    "cost": 1,
+    "damage": 0,
+    "description": "造成等同于你格挡值的伤害。",
+    "rarity": "common"
+  },
+  {
+    "id": "impervious",
+    "name": "坚不可摧",
+    "type": "skill",
+    "cost": 2,
+    "block": 30,
+    "description": "获得30点格挡。消耗。",
+    "rarity": "rare"
+  },
+  {
+    "id": "demon_form",
+    "name": "恶魔形态",
+    "type": "power",
+    "cost": 3,
+    "strength": 2,
+    "description": "在你的回合开始时，获得2点力量。",
+    "rarity": "rare"
+  }
+]

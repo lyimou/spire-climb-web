@@ -1,0 +1,23 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Node (only needed if tooling is added later)
+node_modules/
+dist/
+build/
+
+# Local env
+.env
+.env.local
+
+# Screenshots: keep the folder but not local scratch images
+screenshots/*.tmp
+screenshots/*.psd
