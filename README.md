@@ -48,7 +48,7 @@ python -m http.server 8000
 
 ## Project structure
 
-```
+```text
 spire-climb-web/
 ├── index.html                  # entry point + all screens (map, battle, modals)
 ├── assets/
@@ -56,8 +56,9 @@ spire-climb-web/
 │   ├── game.js                 # game state machine, combat, map, deck logic
 │   └── data/
 │       └── cards.json          # card definitions
+├── scripts/
+│   └── audit-bugs.mjs          # headless behaviour audit (see "Known issues")
 └── screenshots/
-    └── demo.png                # placeholder
 ```
 
 ## How it works
@@ -66,14 +67,44 @@ spire-climb-web/
 - `assets/game.js` holds all state and rules: hero selection, floor progression, card draw/discard, energy and block accounting, enemy turns, and the battle log.
 - `assets/data/cards.json` keeps card data separate from logic, so adding a card does not require touching the combat engine.
 
+## Known issues
+
+`scripts/audit-bugs.mjs` drives the real page in a headless browser and asserts behaviour, so this list is measured rather than guessed. Run it with the folder served over HTTP:
+
+```bash
+python -m http.server 5173
+node scripts/audit-bugs.mjs http://localhost:5173    # needs playwright
+```
+
+**Fixed in this repository:**
+
+| Was | Fix |
+| --- | --- |
+| Enemy HP never re-rendered after a card was played, so the enemy bar stayed full all fight | `playCard()` now calls `updateBattleUI()` |
+| `drawCard()` refilled from discards and then `shuffleDeck()` overwrote the pile with the **whole deck**, duplicating cards and losing others (live total drifted 9 → 13 → 11) | split into `shuffleArray()` + a `shuffleDeck()` that only shuffles the current pile |
+| Victory re-fired on every subsequent card once the enemy died — unlimited gold | battle now carries an `over` flag that `victory()` checks |
+| `endTurn()` threw `TypeError` when no battle was active, and kept resolving after the player died | both paths guarded |
+| Switching heroes accumulated every hero's starting relic | `selectCharacter()` resets relics |
+
+**Still open (documented, not hidden):**
+
+| Issue | Detail |
+| --- | --- |
+| Treasure rooms can never grant anything | `showTreasure()` filters for `rarity === "rare"`, but no rare card exists in the 4-card pool |
+| Relics are inert | They are stored and displayed, but no code reads `effect`, so "燃烧之血" and "蛇之戒指" do nothing |
+| Draw-cards button is dead | It is `disabled` in the markup and its handler calls `this.drawCards()`, which does not exist (the method is `drawCard()`) |
+| `currentFloor` never increments | Clearing all nodes leaves the floor indicator at 1 and the progress bar never reaches 100% |
+| Shop is a stub | `showShop()` is an `alert()` |
+| Chinese text is mojibake in `index.html` | Encoding damage from an earlier tooling pass; the original text is recoverable but has not been rewritten |
+
 ## What I learned / challenges
 
 > First-pass notes drawn from what the code actually does. Replace or expand these with your own account later.
 
-- **State management without a framework**: keeping one source of truth for HP, energy, block, deck and map position, then re-rendering only the affected parts of the DOM, is the core difficulty of a game UI with no framework behind it.
-- **Turn resolution order**: block has to expire at end of turn, damage has to resolve after block, and the battle log has to stay readable — getting this order wrong is what makes combat *feel* broken even when the numbers are right.
-- **Data-driven content**: keeping cards in `assets/data/cards.json` instead of hard-coding their effects made adding and rebalancing cards cheap, and kept the combat engine readable.
-- **Modals and view switching**: most of the UI is a small number of views plus overlays, so a clear "which view is active" rule prevented a whole class of layout bugs.
+- **State management without a framework**: keeping one source of truth for HP, energy, block, deck and map position, then re-rendering only the affected parts of the DOM, is the core difficulty of a game UI with no framework behind it. The enemy-HP bug above is exactly this: the data was right and the screen was wrong.
+- **A "shuffle" that rebuilds state is a trap**: `shuffleDeck()` looked harmless, but because `drawCard()` called it right after moving the discard pile in, it silently reset the pile to the full deck. Card totals drifted instead of staying constant — a bug that only showed up by counting cards across turns.
+- **Terminal states need an explicit flag**: without a "battle is over" flag, any code path that can run after death re-runs the victory reward.
+- **Testing the right thing matters**: an early version of the audit checked `window.game` and reported that the game never started. `let` at the top level of a classic script creates a global *lexical* binding, not a window property — the game had been starting fine. I wrote a fix for a bug that did not exist before measuring properly.
 - **Mobile-first layout**: touch-friendly controls and `maximum-scale=1.0` in the viewport meta mean the same layout has to work on a phone without hover.
 
 ## Attribution & license

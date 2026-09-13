@@ -40,7 +40,6 @@ class SlayTheSpireGame {
     // 初始化基础卡牌
     this.initBaseDeck();
   }
-
   async loadGameData() {
     // 这里应该是从服务器加载数据，暂时用本地数据
     this.cards = [
@@ -203,6 +202,9 @@ class SlayTheSpireGame {
     // 更新角色
     this.gameState.currentCharacter = character;
 
+    // 切角色必须重置换装，否则反复切换会把各角色的初始遗物全部叠加上身
+    this.gameState.relics = [];
+
     // 根据角色设置初始属性
     switch (character) {
       case "ironclad":
@@ -359,6 +361,8 @@ class SlayTheSpireGame {
       ],
       turn: "player",
       round: 1,
+      // 战斗结算标志：没有它的话，敌人死后继续出牌会反复触发 victory()
+      over: false,
     };
 
     this.shuffleDeck();
@@ -367,15 +371,28 @@ class SlayTheSpireGame {
     this.addLog("战斗开始！");
   }
 
-  shuffleDeck() {
-    this.gameState.drawPile = [...this.gameState.deck];
-    for (let i = this.gameState.drawPile.length - 1; i > 0; i--) {
+  /**
+   * Fisher-Yates shuffle of an array (in place).
+   * Returns the same array so it can be used inline.
+   */
+  shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [this.gameState.drawPile[i], this.gameState.drawPile[j]] = [
-        this.gameState.drawPile[j],
-        this.gameState.drawPile[i],
-      ];
+      [array[i], array[j]] = [array[j], array[i]];
     }
+    return array;
+  }
+
+  /**
+   * Shuffle the current draw pile.
+   *
+   * This must NOT rebuild from `deck`: `drawCard()` calls it right after moving
+   * the discard pile into the draw pile, so rebuilding would discard those newly
+   * recycled cards and duplicate the originals (the live card total drifted from
+   * 9 up to 13 and then decayed to 11). See scripts/audit-bugs.mjs.
+   */
+  shuffleDeck() {
+    this.shuffleArray(this.gameState.drawPile);
   }
 
   drawInitialHand() {
@@ -388,10 +405,9 @@ class SlayTheSpireGame {
 
   drawCard() {
     if (this.gameState.drawPile.length === 0) {
-      // 洗入弃牌堆
-      this.gameState.drawPile = [...this.gameState.discard];
+      // 弃牌堆洗回抽牌堆，而不是用整副牌重建
+      this.gameState.drawPile = this.shuffleArray([...this.gameState.discard]);
       this.gameState.discard = [];
-      this.shuffleDeck();
     }
 
     if (this.gameState.drawPile.length > 0) {
@@ -427,6 +443,8 @@ class SlayTheSpireGame {
     this.gameState.discard.push(card);
 
     this.updateUI();
+    // 敌人血量在战斗界面上单独渲染，必须一并刷新，否则血条永远停在满血
+    this.updateBattleUI();
     this.addLog(`使用了 ${card.name}`);
   }
 
@@ -450,10 +468,19 @@ class SlayTheSpireGame {
   }
 
   endTurn() {
+    // 没有进行中的战斗时直接结束，否则会读 undefined.enemies 抛错
+    if (!this.gameState.battle || this.gameState.battle.over) return;
+
     this.addLog("--- 回合结束 ---");
 
     // 敌人行动
     this.enemyTurn();
+
+    // 敌人行动会改变玩家血量，必须刷新界面
+    this.updateUI();
+
+    // 玩家已阵亡：enemyTurn() 已触发 gameOver()，不要再继续结算
+    if (this.gameState.battle.over) return;
 
     // 清理状态
     this.gameState.player.block = 0;
@@ -507,6 +534,10 @@ class SlayTheSpireGame {
   }
 
   victory() {
+    // 只结算一次：否则敌人死后每出一张牌都会再加一次金币
+    if (this.gameState.battle?.over) return;
+    if (this.gameState.battle) this.gameState.battle.over = true;
+
     this.addLog("战斗胜利！");
     this.gameState.currentRoom.completed = true;
 
@@ -537,6 +568,7 @@ class SlayTheSpireGame {
   }
 
   gameOver() {
+    if (this.gameState.battle) this.gameState.battle.over = true;
     this.addLog("游戏结束！");
     alert("游戏结束！你被击败了。");
     this.showStartScreen();
@@ -711,7 +743,8 @@ class SlayTheSpireGame {
       { ...this.cards.find((c) => c.id === "defend") },
     ];
 
-    this.shuffleDeck();
+    // 用整副牌建立抽牌堆并洗牌（shuffleDeck 本身只打乱现有抽牌堆）
+    this.gameState.drawPile = this.shuffleArray([...this.gameState.deck]);
   }
 
   showTreasure() {
@@ -749,6 +782,16 @@ class SlayTheSpireGame {
 
 // 初始化游戏
 let game;
-window.addEventListener("DOMContentLoaded", () => {
+function bootstrapGame() {
   game = new SlayTheSpireGame();
-});
+}
+
+// This <script> is a classic script at the end of <body>, so by the time it runs
+// `document.readyState` is already "interactive"/"complete" and DOMContentLoaded
+// has ALREADY fired. Registering only a DOMContentLoaded listener therefore never
+// ran, `game` stayed undefined, and the game never started at all.
+if (document.readyState === "loading") {
+  window.addEventListener("DOMContentLoaded", bootstrapGame);
+} else {
+  bootstrapGame();
+}
