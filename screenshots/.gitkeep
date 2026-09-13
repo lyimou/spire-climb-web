@@ -1,2 +1,4 @@
-# Placeholder so the screenshots/ folder exists in git.
-# Add demo.png / demo.gif here and reference it from README.md.
+# Add screenshots here, then reference them from README.md.
+#
+# Suggested: one gameplay map view and one battle view.
+# Keep files small (< 300 KB each) and prefer PNG.

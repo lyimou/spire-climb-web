@@ -10,13 +10,11 @@ Pick a hero, climb a procedurally laid-out floor map, and fight turn-based battl
 
 ## Preview
 
-![screenshot](screenshots/demo.png)
+<!-- TODO: add screenshots here, e.g. ![map](screenshots/map.png) ![battle](screenshots/battle.png) -->
 
-> Placeholder — add a screenshot or GIF to `screenshots/demo.png`.
+*No screenshots yet — the game is playable as-is; open `index.html` to see it.*
 
 ## Live demo
-
-Demo link: `{{https://lyimou.github.io/spire-climb-web/}}` (to be enabled via GitHub Pages)
 
 To run locally, just open `index.html` — or serve the folder:
 
@@ -36,6 +34,7 @@ python -m http.server 8000
 - **Data-driven card definitions** in `assets/data/cards.json`
 - **Responsive, mobile-friendly layout** (`viewport` tuned, touch-friendly controls)
 - **Chinese UI** with `Noto Sans SC` typography
+- **Settings & persistence-free by design**: fast mode, damage numbers and animation speed are in-game options; nothing is sent anywhere and there is no backend call in the codebase
 
 ## Tech stack
 
@@ -69,13 +68,13 @@ spire-climb-web/
 
 ## What I learned / challenges
 
-<!-- Replace the {{...}} placeholders with your own words. -->
+> First-pass notes drawn from what the code actually does. Replace or expand these with your own account later.
 
-- **State management without a framework**: keeping a single source of truth for HP, energy, block, deck and map state, and re-rendering the affected UI, is the core difficulty of a UI-heavy game with no framework.
-- **Turn resolution order**: block must expire at end of turn, damage must resolve after block, and the log has to stay readable — ordering bugs here are what make combat feel "wrong".
-- **Data-driven design**: moving cards into JSON made balancing and adding content far cheaper than hard-coding effects.
-- **{{What surprised you most?}}**
-- **{{What would you refactor first if you continued?}}**
+- **State management without a framework**: keeping one source of truth for HP, energy, block, deck and map position, then re-rendering only the affected parts of the DOM, is the core difficulty of a game UI with no framework behind it.
+- **Turn resolution order**: block has to expire at end of turn, damage has to resolve after block, and the battle log has to stay readable — getting this order wrong is what makes combat *feel* broken even when the numbers are right.
+- **Data-driven content**: keeping cards in `assets/data/cards.json` instead of hard-coding their effects made adding and rebalancing cards cheap, and kept the combat engine readable.
+- **Modals and view switching**: most of the UI is a small number of views plus overlays, so a clear "which view is active" rule prevented a whole class of layout bugs.
+- **Mobile-first layout**: touch-friendly controls and `maximum-scale=1.0` in the viewport meta mean the same layout has to work on a phone without hover.
 
 ## Attribution & license
 
